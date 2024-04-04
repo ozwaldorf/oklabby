@@ -12,8 +12,16 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, crane, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      crane,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs.lib) optionals;
@@ -28,23 +36,30 @@
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-        oklabby =
-          craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
-      in {
+        oklabby = craneLib.buildPackage (commonArgs // { inherit cargoArtifacts; });
+      in
+      {
         checks = {
           fmt = craneLib.cargoFmt (commonArgs // { inherit cargoArtifacts; });
           doc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
-          clippy = craneLib.cargoClippy (commonArgs // {
-            inherit cargoArtifacts;
-            cargoClippyExtraArgs =
-              "--all-targets --all-features -- -Dclippy::all -Dwarnings";
-          });
+          clippy = craneLib.cargoClippy (
+            commonArgs
+            // {
+              inherit cargoArtifacts;
+              cargoClippyExtraArgs = "--all-targets --all-features -- -Dclippy::all -Dwarnings";
+            }
+          );
         };
-        packages = { default = oklabby; };
+        packages.default = oklabby;
         apps.default = flake-utils.lib.mkApp { drv = oklabby; };
         devShells.default = craneLib.devShell {
           # Inherit inputs from checks.
           checks = self.checks.${system};
         };
-      });
+        formatter = pkgs.nixfmt-rfc-style;
+      }
+    )
+    // {
+      overlays.default = _: prev: { oklabby = self.packages.${prev.system}.default; };
+    };
 }
