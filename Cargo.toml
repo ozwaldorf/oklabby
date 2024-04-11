@@ -8,7 +8,9 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
+anstream = "0.6"
+anstyle = "1.0.6"
 clap = { version  = "4.5", features = ["derive"] }
-oklab = "1.0"
 hex = "0.4"
 interpolation = "0.3"
+oklab = "1.0"

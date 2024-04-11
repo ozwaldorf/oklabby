@@ -1,3 +1,5 @@
+use anstream::println;
+use anstyle::RgbColor;
 use clap::{Parser, Subcommand};
 use hex::encode;
 use oklab::{oklab_to_srgb, srgb_to_oklab, Oklab};
@@ -103,14 +105,33 @@ fn main() {
         Cmd::Average { colors } => {
             let avg = average(&parse(colors));
             let rgb: [u8; 3] = oklab_to_srgb(avg).into();
-            println!("#{}\t{rgb:?}", encode(rgb));
+
+            let style = if avg.l < 0.5 {
+                RgbColor(255, 255, 255).on(RgbColor(rgb[0], rgb[1], rgb[2]))
+            } else {
+                RgbColor(0, 0, 0).on(RgbColor(rgb[0], rgb[1], rgb[2]))
+            };
+
+            println!("{style}#{}\t{rgb:?}{}", encode(rgb), anstyle::Reset);
         }
         Cmd::Quantize { colors, steps } => {
             let colors = parse(colors);
             for s in colors.windows(2) {
                 for (color, scalar) in quantize(&s[0], &s[1], steps) {
                     let rgb: [u8; 3] = oklab_to_srgb(color).into();
-                    println!("{scalar:.2}:\t#{}\t{rgb:?}", encode(rgb));
+                    let [r, g, b] = rgb;
+
+                    let style = if color.l < 0.5 {
+                        RgbColor(255, 255, 255).on(RgbColor(r, g, b))
+                    } else {
+                        RgbColor(0, 0, 0).on(RgbColor(r, g, b))
+                    };
+
+                    println!(
+                        "{style}{scalar:.2}:\t#{}\trgb({r:3},{g:3},{b:3}){}",
+                        encode(rgb),
+                        anstyle::Reset
+                    );
                 }
             }
         }
