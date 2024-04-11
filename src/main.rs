@@ -1,18 +1,12 @@
 use anstream::println;
 use anstyle::RgbColor;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use hex::encode;
 use oklab::{oklab_to_srgb, srgb_to_oklab, Oklab};
 
 #[derive(Parser)]
 #[command(version, about)]
-struct Args {
-    #[command(subcommand)]
-    cmd: Cmd,
-}
-
-#[derive(Subcommand)]
-enum Cmd {
+enum Oklabby {
     /// Average a list of colors together
     Average {
         #[clap(required = true)]
@@ -30,7 +24,6 @@ enum Cmd {
 #[inline(always)]
 fn parse_one(s: String) -> Oklab {
     let trimmed = s.trim_start_matches('#');
-
     let mut c = [0u8; 3];
     match trimmed.len() {
         3 => {
@@ -54,7 +47,22 @@ fn parse(input: Vec<String>) -> Vec<Oklab> {
 }
 
 #[inline(always)]
-fn average(colors: &[Oklab]) -> Oklab {
+fn format_color(color: Oklab) -> String {
+    let rgb @ [r, g, b]: [u8; 3] = oklab_to_srgb(color).into();
+    format!(
+        "{}#{}\trgb({r:3},{g:3},{b:3}){}",
+        if color.l < 0.5 {
+            RgbColor(255, 255, 255).on(RgbColor(r, g, b))
+        } else {
+            RgbColor(0, 0, 0).on(RgbColor(r, g, b))
+        },
+        encode(&rgb),
+        anstyle::Reset
+    )
+}
+
+#[inline(always)]
+fn average(colors: Vec<Oklab>) -> Oklab {
     let mut t = colors.iter().fold(
         Oklab {
             l: 0.0,
@@ -76,64 +84,36 @@ fn average(colors: &[Oklab]) -> Oklab {
     t
 }
 
-fn quantize(a: &Oklab, b: &Oklab, mut steps: usize) -> Vec<(Oklab, f32)> {
-    steps -= 1;
-    let mut colors = Vec::with_capacity(steps);
+#[inline(always)]
+fn quantize(a: &Oklab, b: &Oklab, steps: usize) -> Vec<(Oklab, f32)> {
+    let percent = 1.0 / (steps - 1) as f32;
     let a = &[a.l, a.a, a.b];
     let b = &[b.l, b.a, b.b];
-    let percent = 1.0 / steps as f32;
-
-    for i in 0..=steps {
-        let scalar = percent * i as f32;
-        let t = interpolation::lerp(a, b, &scalar);
-        colors.push((
-            Oklab {
-                l: t[0],
-                a: t[1],
-                b: t[2],
-            },
-            scalar,
-        ))
-    }
-
-    colors
+    (0..steps)
+        .map(|i| {
+            let scalar = percent * i as f32;
+            let t = interpolation::lerp(a, b, &scalar);
+            (
+                Oklab {
+                    l: t[0],
+                    a: t[1],
+                    b: t[2],
+                },
+                scalar,
+            )
+        })
+        .collect()
 }
 
 fn main() {
-    let cmd = Args::parse().cmd;
-    match cmd {
-        Cmd::Average { colors } => {
-            let avg = average(&parse(colors));
-            let rgb: [u8; 3] = oklab_to_srgb(avg).into();
-
-            let style = if avg.l < 0.5 {
-                RgbColor(255, 255, 255).on(RgbColor(rgb[0], rgb[1], rgb[2]))
-            } else {
-                RgbColor(0, 0, 0).on(RgbColor(rgb[0], rgb[1], rgb[2]))
-            };
-
-            println!("{style}#{}\t{rgb:?}{}", encode(rgb), anstyle::Reset);
-        }
-        Cmd::Quantize { colors, steps } => {
-            let colors = parse(colors);
-            for s in colors.windows(2) {
-                for (color, scalar) in quantize(&s[0], &s[1], steps) {
-                    let rgb: [u8; 3] = oklab_to_srgb(color).into();
-                    let [r, g, b] = rgb;
-
-                    let style = if color.l < 0.5 {
-                        RgbColor(255, 255, 255).on(RgbColor(r, g, b))
-                    } else {
-                        RgbColor(0, 0, 0).on(RgbColor(r, g, b))
-                    };
-
-                    println!(
-                        "{style}{scalar:.2}:\t#{}\trgb({r:3},{g:3},{b:3}){}",
-                        encode(rgb),
-                        anstyle::Reset
-                    );
-                }
-            }
-        }
+    match Oklabby::parse() {
+        Oklabby::Average { colors } => println!("{}", format_color(average(parse(colors)))),
+        Oklabby::Quantize { colors, steps } => parse(colors)
+            .windows(2)
+            .map(|s| quantize(&s[0], &s[1], steps))
+            .flatten()
+            .for_each(|(color, scalar)| {
+                println!("{scalar:.2}:\t{}", format_color(color));
+            }),
     }
 }
