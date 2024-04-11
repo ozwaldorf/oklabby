@@ -26,17 +26,21 @@ enum Cmd {
 }
 
 #[inline(always)]
-fn parse_one(mut s: String) -> Oklab {
-    // extend 3 character rgb
-    if s.len() == 3 {
-        let t = s.clone();
-        s.push_str(&t);
-    }
+fn parse_one(s: String) -> Oklab {
+    let trimmed = s.trim_start_matches('#');
 
-    // parse hex string into rgb
-    let hex = s.trim_start_matches('#');
     let mut c = [0u8; 3];
-    hex::decode_to_slice(hex, &mut c).expect("valid hex color");
+    match trimmed.len() {
+        3 => {
+            // Extend 3 character hex colors
+            let mut t = String::with_capacity(6);
+            t.push_str(trimmed);
+            t.push_str(trimmed);
+            hex::decode_to_slice(&t, &mut c).expect("Invalid RGB color")
+        }
+        6 => hex::decode_to_slice(trimmed, &mut c).expect("Invalid RGB color"),
+        _ => panic!("Malformed RGB hex code: {s}"),
+    }
 
     // convert to oklab
     srgb_to_oklab(c.into())
@@ -72,12 +76,11 @@ fn average(colors: &[Oklab]) -> Oklab {
 
 fn quantize(a: &Oklab, b: &Oklab, mut steps: usize) -> Vec<(Oklab, f32)> {
     steps -= 1;
+    let mut colors = Vec::with_capacity(steps);
     let a = &[a.l, a.a, a.b];
     let b = &[b.l, b.a, b.b];
-
-    let mut colors = Vec::with_capacity(steps);
-
     let percent = 1.0 / steps as f32;
+
     for i in 0..=steps {
         let scalar = percent * i as f32;
         let t = interpolation::lerp(a, b, &scalar);
@@ -90,6 +93,7 @@ fn quantize(a: &Oklab, b: &Oklab, mut steps: usize) -> Vec<(Oklab, f32)> {
             scalar,
         ))
     }
+
     colors
 }
 
