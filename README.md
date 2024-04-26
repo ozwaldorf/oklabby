@@ -23,6 +23,12 @@ Cache is provided via https://garnix.io
 
 ### Examples
 
+#### Show different encodings of colors
+
+```bash
+oklabby show 000 fff
+```
+
 #### Average N colors
 
 ![image](https://github.com/ozwaldorf/oklabby/assets/8976745/e41bba07-f376-4ef1-9a68-ea48396e1aa7)

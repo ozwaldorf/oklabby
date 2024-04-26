@@ -7,6 +7,12 @@ use oklab::{oklab_to_srgb, srgb_to_oklab, Oklab};
 #[derive(Parser)]
 #[command(version, about)]
 enum Oklabby {
+    /// Show different encodings of colors
+    Show {
+        /// List of colors, either RGB8 hex `#000`, or oklab `[0.0, 0.5, 1.0]`
+        #[clap(required = true)]
+        colors: Vec<String>,
+    },
     /// Average a list of colors together.
     Average {
         /// List of colors, either RGB8 hex `#000`, or oklab `[0.0, 0.5, 1.0]`
@@ -120,6 +126,9 @@ fn quantize(a: &Oklab, b: &Oklab, steps: usize) -> Vec<(Oklab, f32)> {
 
 fn main() {
     match Oklabby::parse() {
+        Oklabby::Show { colors } => parse(colors)
+            .into_iter()
+            .for_each(|color| println!("{}", format_color(color))),
         Oklabby::Average { colors } => println!("{}", format_color(average(parse(colors)))),
         Oklabby::Quantize { colors, steps } => parse(colors)
             .windows(2)
